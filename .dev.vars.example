@@ -1,0 +1,5 @@
+# Copy this file to `.dev.vars` (which is gitignored) and paste your Notion token.
+# Local `wrangler pages dev` reads `.dev.vars` automatically.
+# The token must be a Notion internal integration secret with READ access to
+# the "Питание" database. Never commit the real value.
+NOTION_TOKEN=ntn_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

@@ -1,9 +1,14 @@
 /**
- * Cloudflare Pages Function — read-only proxy to the Notion "Питание" database.
+ * Cloudflare Worker — serves the built SPA from ./dist (Static Assets) and a
+ * read-only proxy to the Notion "Питание" database on /api/nutrition.
  *
  * Why a proxy: the Notion API has no CORS and the token must never reach the
- * client. Frontend + this function share one origin, so no CORS headers and no
+ * client. Frontend + this Worker share one origin, so no CORS headers and no
  * client-side key are needed.
+ *
+ * Routing (see wrangler.jsonc): `run_worker_first: ["/api/*"]` means only
+ * /api/* requests reach this Worker — static files and the SPA fallback are
+ * handled at the asset layer, so we never touch env.ASSETS here.
  *
  * Route: GET /api/nutrition?since=YYYY-MM-DD   (since is optional)
  */
@@ -15,11 +20,6 @@ const MAX_PAGES = 25; // safety guard against runaway pagination (25 * 100 rows)
 
 interface Env {
   NOTION_TOKEN: string;
-}
-
-interface PagesContext {
-  request: Request;
-  env: Env;
 }
 
 // --- Notion response shapes (only the parts we read) ---
@@ -107,15 +107,17 @@ function normalize(page: NotionPage): Meal {
   };
 }
 
-export async function onRequestGet(context: PagesContext): Promise<Response> {
-  const { request, env } = context;
-
+/**
+ * Handles GET /api/nutrition. Exported separately so the live integration test
+ * can call it directly without going through asset routing.
+ */
+export async function handleNutrition(request: Request, env: Env): Promise<Response> {
   if (!env.NOTION_TOKEN) {
     console.error("NOTION_TOKEN is not configured in the environment.");
     return json(
       {
         error:
-          "NOTION_TOKEN не задан. Добавь его в переменные окружения Pages (или .dev.vars локально).",
+          "NOTION_TOKEN не задан. Добавь его в секреты Worker (Settings → Variables and Secrets), или в .dev.vars локально.",
       },
       500,
     );
@@ -177,3 +179,20 @@ export async function onRequestGet(context: PagesContext): Promise<Response> {
     );
   }
 }
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const { pathname } = new URL(request.url);
+
+    if (pathname === "/api/nutrition") {
+      if (request.method !== "GET") {
+        return json({ error: "Method Not Allowed" }, 405);
+      }
+      return handleNutrition(request, env);
+    }
+
+    // run_worker_first only routes /api/* here, so anything else is an unknown
+    // API path. Static files and the SPA shell never reach this handler.
+    return json({ error: "Not found" }, 404);
+  },
+};

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { onRequestGet } from "./nutrition";
+import { handleNutrition } from "./index";
 
 /**
  * LIVE integration check for the Notion proxy. It hits the real Notion API, so
@@ -18,12 +18,10 @@ describe("Notion proxy (live)", () => {
   it.runIf(Boolean(token))(
     "queries the data source and returns normalized meals",
     async () => {
-      const res = await onRequestGet({
-        request: new Request(
-          "http://localhost/api/nutrition?since=2026-01-01",
-        ),
-        env: { NOTION_TOKEN: token! },
-      });
+      const res = await handleNutrition(
+        new Request("http://localhost/api/nutrition?since=2026-01-01"),
+        { NOTION_TOKEN: token! },
+      );
 
       expect(res.status).toBe(200);
       const data = (await res.json()) as {

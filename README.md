@@ -6,7 +6,7 @@
 и дефицита.
 
 - **Стек:** Vite + React + TypeScript + Tailwind v4 + shadcn/ui (Base UI) + recharts.
-- **Хостинг:** Cloudflare Pages + Pages Function (`/api/nutrition`) как прокси к Notion.
+- **Хостинг:** Cloudflare Workers — статика (Static Assets) + Worker на `/api/nutrition` как прокси к Notion.
 - **Доступ:** закрывается через Cloudflare Access (Zero Trust).
 - Обычное онлайн-SPA (без service worker). «Установка» = ярлык из браузера на
   домашний экран телефона.
@@ -14,11 +14,11 @@
 ## Как это устроено
 
 ```
-Браузер (SPA)  ──GET /api/nutrition?since=YYYY-MM-DD──▶  Pages Function  ──▶  Notion API
+Браузер (SPA)  ──GET /api/nutrition?since=YYYY-MM-DD──▶  Worker  ──▶  Notion API
    рисует кольца/карточки/графики          держит NOTION_TOKEN в env, ходит в Notion
 ```
 
-Фронтенд и функция живут на **одном origin**, поэтому CORS не нужен, а токен
+Фронтенд и Worker живут на **одном origin**, поэтому CORS не нужен, а токен
 никогда не попадает в браузер. При загрузке делается **один** запрос за 7 дней
 (`since = сегодня − 6`), а переключение Сегодня / 2 / 3 / 7 считается на клиенте —
 мгновенно, без новых запросов.
@@ -30,7 +30,10 @@
 
 - **Локально:** скопируй `.dev.vars.example` → `.dev.vars` и впиши токен.
   `.dev.vars` в `.gitignore` — в репозиторий не попадёт.
-- **Прод:** задаётся как секрет Pages (см. «Деплой»). В коде/гите токена быть не должно.
+- **Прод:** задаётся как секрет Worker (см. «Деплой»). В коде/гите токена быть не должно.
+
+Помимо секрета, в `wrangler.jsonc` есть **не-секретные** `vars` для проверки токена
+Cloudflare Access — `ACCESS_JWKS_URL` и `ACCESS_AUD` (см. «Доступ»). Их можно коммитить.
 
 ## Локальный запуск
 
@@ -43,7 +46,7 @@ npm run dev
 `npm run dev` поднимает два процесса параллельно:
 
 - **Vite** (`http://localhost:5173`) — сам дашборд с HMR;
-- **`wrangler pages dev`** (`http://localhost:8788`) — Pages Function локально.
+- **`wrangler dev --port 8788`** — Worker локально (обрабатывает `/api/*`).
 
 Vite проксирует `/api/*` на `:8788` (см. `vite.config.ts`), так что открывай
 **`http://localhost:5173`**. `wrangler` автоматически подхватывает `.dev.vars`.
@@ -75,38 +78,45 @@ NOTION_TOKEN=ntn_xxx npm test
 Без `NOTION_TOKEN` этот тест помечается как skipped. В выводе посмотри на печатаемые
 `meals` — даты, названия и числа БЖУ должны быть осмысленными.
 
-## Деплой на Cloudflare Pages
+## Деплой на Cloudflare Workers
 
-Деплой прямой загрузкой через Wrangler (Git-репозиторий не обязателен):
+Деплой через Wrangler (Git-репозиторий не обязателен):
 
 ```bash
-# один раз — создать проект
-npx wrangler pages project create nutrition-dashboard
-
-# задать прод-секрет (Production и Preview)
-npx wrangler pages secret put NOTION_TOKEN
+# задать прод-секрет (один раз; меняется тем же командой)
+npx wrangler secret put NOTION_TOKEN
 
 # собрать и задеплоить
-npm run deploy            # = npm run build && wrangler pages deploy dist --project-name nutrition-dashboard
+npm run deploy            # = npm run build && wrangler deploy
 ```
 
-Альтернатива — подключить Git-репозиторий в дашборде Pages (build command
-`npm run build`, output dir `dist`) и задать `NOTION_TOKEN` в Settings → Variables
-and Secrets как **secret** для Production и Preview.
+После деплоя приложение доступно на
+`https://nutrition-dashboard.<твой-сабдомен>.workers.dev`. Имя воркера и роутинг
+заданы в `wrangler.jsonc` (`name`, `assets`, `run_worker_first: ["/api/*"]`).
+Секрет `NOTION_TOKEN` можно также задать в дашборде: **Workers & Pages →
+nutrition-dashboard → Settings → Variables and Secrets**.
 
 ## Доступ: Cloudflare Access (Zero Trust)
 
-Чтобы личные данные не были открыты по публичному URL:
+Чтобы личные данные не были открыты по публичному URL, перед воркером ставится
+Access — логин-стена на edge Cloudflare (запрос проверяется ещё до кода воркера).
 
-1. Cloudflare dashboard → **Zero Trust → Access → Applications → Add application →
-   Self-hosted**.
-2. Домен приложения: `nutrition-dashboard.pages.dev` (и кастомный домен, если будет).
-3. Policy: **Allow**, Include → **Emails** → твой email. Метод входа — One-time PIN
-   или Google.
+1. Dashboard → **Workers & Pages → nutrition-dashboard → Settings →
+   Domains & Routes** → у **Worker URL** нажми **Enable Cloudflare Access**
+   (для `*.workers.dev` это делается в один клик; политика создаётся автоматически).
+2. **Zero Trust → Access → Applications** → открой созданное приложение →
+   **Policies** → **Allow**, Include → **Emails** → твой email. Метод входа —
+   One-time PIN или Google.
 
 Access закрывает весь хост, включая `/api` — прокси тоже под защитой. Ярлык
 открывается в обычном браузере и делит cookie-сессию Access с ним, так что
 повторных логинов из-за изоляции нет.
+
+Дополнительно (defense-in-depth) сам воркер проверяет подписанный токен Access
+`Cf-Access-Jwt-Assertion` — см. [`worker/access.ts`](worker/access.ts). Для этого в
+`wrangler.jsonc` заданы не-секретные `vars` **`ACCESS_JWKS_URL`** и **`ACCESS_AUD`**
+(значения — из диалога Access app: «JWKs URL» и «Audience (aud)»). На `localhost`
+(`wrangler dev`) проверка пропускается, чтобы не ломать локальную разработку.
 
 ## Установка ярлыка на телефон
 
@@ -126,6 +136,6 @@ Access закрывает весь хост, включая `/api` — прок�
 - API-модель `Notion-Version: 2025-09-03`, эндпоинт
   `POST /v1/data_sources/{DATA_SOURCE_ID}/query`.
 - `DATA_SOURCE_ID` базы «Питание» и имена полей зашиты в
-  [`functions/api/nutrition.ts`](functions/api/nutrition.ts). Имена полей —
+  [`worker/index.ts`](worker/index.ts). Имена полей —
   посимвольно русские (`Калории`, `Белок, г`, …), менять нельзя.
 - Приложение **только читает** Notion. Никаких записей.

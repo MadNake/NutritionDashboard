@@ -13,7 +13,7 @@ export default defineConfig({
   },
   server: {
     // Dev: Vite serves the SPA with HMR on 5173 and proxies /api to the
-    // Cloudflare Pages Functions running under `wrangler pages dev` on 8788.
+    // Worker running under `wrangler dev` on 8788.
     proxy: {
       "/api": "http://localhost:8788",
     },

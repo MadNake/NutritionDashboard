@@ -13,12 +13,14 @@
  * Route: GET /api/nutrition?since=YYYY-MM-DD   (since is optional)
  */
 
+import { isAccessAuthorized, type AccessEnv } from "./access";
+
 const DATA_SOURCE_ID = "0dfffdcc-2586-4b80-853d-678cc149fde9";
 const NOTION_VERSION = "2025-09-03";
 const NOTION_QUERY_URL = `https://api.notion.com/v1/data_sources/${DATA_SOURCE_ID}/query`;
 const MAX_PAGES = 25; // safety guard against runaway pagination (25 * 100 rows)
 
-interface Env {
+interface Env extends AccessEnv {
   NOTION_TOKEN: string;
 }
 
@@ -185,6 +187,11 @@ export default {
     const { pathname } = new URL(request.url);
 
     if (pathname === "/api/nutrition") {
+      // Defense-in-depth: reject anything reaching this endpoint without a valid
+      // Access JWT. No-op when Access vars are unset (local dev) — see access.ts.
+      if (!(await isAccessAuthorized(request, env))) {
+        return json({ error: "Unauthorized" }, 403);
+      }
       if (request.method !== "GET") {
         return json({ error: "Method Not Allowed" }, 405);
       }

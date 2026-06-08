@@ -119,7 +119,7 @@ export async function handleNutrition(request: Request, env: Env): Promise<Respo
     return json(
       {
         error:
-          "NOTION_TOKEN не задан. Добавь его в секреты Worker (Settings → Variables and Secrets), или в .dev.vars локально.",
+          "NOTION_TOKEN is not set. Add it as a Worker secret (Settings → Variables and Secrets), or in .dev.vars locally.",
       },
       500,
     );
@@ -127,7 +127,7 @@ export async function handleNutrition(request: Request, env: Env): Promise<Respo
 
   const since = new URL(request.url).searchParams.get("since");
   if (since && !ISO_DATE.test(since)) {
-    return json({ error: "Параметр since должен быть в формате YYYY-MM-DD." }, 400);
+    return json({ error: "The 'since' parameter must be in YYYY-MM-DD format." }, 400);
   }
 
   const body: Record<string, unknown> = {
@@ -159,7 +159,7 @@ export async function handleNutrition(request: Request, env: Env): Promise<Respo
         // Do NOT log the token; the detail from Notion is safe to surface.
         console.error(`Notion error ${res.status}: ${detail}`);
         return json(
-          { error: `Notion вернул ошибку ${res.status}`, status: res.status, detail },
+          { error: `Notion returned error ${res.status}`, status: res.status, detail },
           res.status === 401 || res.status === 403 ? res.status : 502,
         );
       }
@@ -176,7 +176,7 @@ export async function handleNutrition(request: Request, env: Env): Promise<Respo
   } catch (err) {
     console.error("Proxy failed to reach Notion:", err);
     return json(
-      { error: "Не удалось получить данные из Notion.", detail: String(err) },
+      { error: "Failed to fetch data from Notion.", detail: String(err) },
       502,
     );
   }

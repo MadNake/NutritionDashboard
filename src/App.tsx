@@ -29,7 +29,7 @@ export default function App() {
   const [period, setPeriod] = useState(1);
 
   useEffect(() => {
-    if (error) toast.error("Не удалось обновить данные", { description: error });
+    if (error) toast.error("Failed to refresh data", { description: error });
   }, [error]);
 
   const agg = useMemo(() => aggregateForPeriod(meals, period), [meals, period]);

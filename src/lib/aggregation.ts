@@ -56,7 +56,7 @@ export interface PeriodAggregate {
   sum: Totals;
   /** Per-day totals (a day with no meals = 0 — a fair daily average). */
   perDay: DayTotals[];
-  /** What to show: the sum for "Сегодня" (N=1) or the per-day average (N>1). */
+  /** What to show: the sum for "Today" (N=1) or the per-day average (N>1). */
   display: Totals;
   /** True when display is an average (N>1). */
   isAverage: boolean;

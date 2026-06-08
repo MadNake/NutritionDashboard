@@ -1,18 +1,18 @@
 /**
- * Daily MINIMUMS to reliably hit — framed as "сколько ещё добрать", never caps.
+ * Daily MINIMUMS to reliably hit — framed as "how much more to eat", never caps.
  * Editable in-app (stored in localStorage); these are the seed defaults.
  */
 export interface Goals {
-  calories: number; // ккал/день, минимум
-  protein: number; // г/день
-  fiber: number; // г/день
-  weight: number; // кг — для подсказки белка (1.6 × вес)
+  calories: number; // kcal/day, minimum
+  protein: number; // g/day
+  fiber: number; // g/day
+  weight: number; // kg — used for protein suggestion (1.6 × weight)
 }
 
 export const DEFAULT_GOALS: Goals = {
   calories: 2250,
-  protein: 100, // ≈ 1.6 × 62 кг
-  fiber: 30, // ориентир 25–35
+  protein: 100, // ≈ 1.6 × 62 kg
+  fiber: 30, // target 25–35
   weight: 62,
 };
 

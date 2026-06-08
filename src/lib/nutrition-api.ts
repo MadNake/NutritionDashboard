@@ -2,14 +2,14 @@
 export interface Meal {
   id: string;
   date: string | null; // "YYYY-MM-DD"
-  meal: string | null; // Завтрак / Обед / Ужин / Перекус
+  meal: string | null; // Breakfast / Lunch / Dinner / Snack (Notion field values)
   name: string;
   kcal: number;
   protein: number;
   fat: number;
   carbs: number;
   fiber: number;
-  source: string | null; // "Оценка по фото" | "Точно"
+  source: string | null; // "Photo estimate" | "Exact" (Notion field values)
 }
 
 export interface NutritionResponse {

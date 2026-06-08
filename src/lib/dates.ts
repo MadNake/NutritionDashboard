@@ -61,12 +61,12 @@ const timeFmt = new Intl.DateTimeFormat("ru-RU", {
   minute: "2-digit",
 });
 
-/** Short label for charts/axes, e.g. "пн, 6". */
+/** Short label for charts/axes, e.g. "Mon, 6" (locale-formatted). */
 export function formatDayLabel(key: string): string {
   return dayLabelFmt.format(dateFromKey(key));
 }
 
-/** "сегодня в 14:32" style label for the last-refresh timestamp. */
+/** Time-only label for the last-refresh timestamp, e.g. "14:32". */
 export function formatFetchedAt(iso: string): string {
   const d = new Date(iso);
   return timeFmt.format(d);

@@ -9,7 +9,7 @@ interface MacroCardProps {
   color: string;
   /** Present → goal mode (progress + remaining). Absent → informational. */
   goal?: number;
-  /** Wording for the gap, e.g. "осталось добрать" or "не хватает/день". */
+  /** Wording for the gap, e.g. "still needed" or "shortfall/day". */
   remainingLabel?: string;
 }
 

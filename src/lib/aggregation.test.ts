@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   aggregateForPeriod,
+  aggregateForRange,
   calorieBreakdown,
   progress,
   remaining,
@@ -80,6 +81,42 @@ describe("aggregateForPeriod", () => {
       1,
     );
     expect(agg.display.kcal).toBe(100);
+  });
+});
+
+describe("aggregateForRange (arbitrary past windows)", () => {
+  it("N=1 past day sums only that day's meals", () => {
+    const agg = aggregateForRange(
+      [
+        meal({ date: "2026-05-10", kcal: 400, protein: 25 }),
+        meal({ date: "2026-05-10", kcal: 300, protein: 15 }),
+        meal({ date: "2026-05-11", kcal: 999 }),
+      ],
+      "2026-05-10",
+      "2026-05-10",
+    );
+    expect(agg.isAverage).toBe(false);
+    expect(agg.periodDays).toBe(1);
+    expect(agg.display.kcal).toBe(700);
+    expect(agg.display.protein).toBe(40);
+    expect(agg.windowMeals).toHaveLength(2);
+  });
+
+  it("averages a past range over calendar days, counting empty days as 0", () => {
+    // window = 10, 11, 12; meals only on 10 and 12.
+    const agg = aggregateForRange(
+      [
+        meal({ date: "2026-05-10", kcal: 900 }),
+        meal({ date: "2026-05-12", kcal: 900 }),
+      ],
+      "2026-05-10",
+      "2026-05-12",
+    );
+    expect(agg.isAverage).toBe(true);
+    expect(agg.periodDays).toBe(3);
+    expect(agg.sum.kcal).toBe(1800);
+    expect(agg.display.kcal).toBe(600); // 1800 / 3, not / 2
+    expect(agg.perDay.map((day) => day.totals.kcal)).toEqual([900, 0, 900]);
   });
 });
 

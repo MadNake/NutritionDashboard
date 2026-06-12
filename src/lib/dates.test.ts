@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { lastNDateKeys, sinceKey, toLocalKey, todayKey } from "@/lib/dates";
+import {
+  dateKeysInRange,
+  formatRangeLabel,
+  presetRange,
+  toLocalKey,
+  todayKey,
+} from "@/lib/dates";
 
 describe("dates (local timezone)", () => {
   beforeEach(() => {
@@ -13,25 +19,34 @@ describe("dates (local timezone)", () => {
     expect(todayKey()).toBe("2026-06-15");
   });
 
-  it("sinceKey(6) and default give today − 6 days", () => {
-    expect(sinceKey(6)).toBe("2026-06-09");
-    expect(sinceKey()).toBe("2026-06-09");
+  it("presetRange(7) is a 7-day window ending today", () => {
+    expect(presetRange(7)).toEqual({ start: "2026-06-09", end: "2026-06-15" });
   });
 
-  it("lastNDateKeys(7) is 7 ascending keys including today", () => {
-    expect(lastNDateKeys(7)).toEqual([
-      "2026-06-09",
-      "2026-06-10",
-      "2026-06-11",
-      "2026-06-12",
+  it("presetRange(1) is just today (start === end)", () => {
+    expect(presetRange(1)).toEqual({ start: "2026-06-15", end: "2026-06-15" });
+  });
+
+  it("dateKeysInRange is inclusive and ascending", () => {
+    expect(dateKeysInRange("2026-06-13", "2026-06-15")).toEqual([
       "2026-06-13",
       "2026-06-14",
       "2026-06-15",
     ]);
   });
 
-  it("lastNDateKeys(1) is just today", () => {
-    expect(lastNDateKeys(1)).toEqual(["2026-06-15"]);
+  it("dateKeysInRange with equal start/end is a single key", () => {
+    expect(dateKeysInRange("2026-06-15", "2026-06-15")).toEqual(["2026-06-15"]);
+  });
+
+  it("formatRangeLabel renders a span with a numeric DD.MM dash range", () => {
+    expect(formatRangeLabel("2026-05-01", "2026-05-31")).toBe("01.05 – 31.05");
+  });
+
+  it("formatRangeLabel renders a single day without a dash separator", () => {
+    const label = formatRangeLabel("2026-06-15", "2026-06-15");
+    expect(label).not.toContain("–");
+    expect(label.length).toBeGreaterThan(0);
   });
 
   it("toLocalKey zero-pads month and day", () => {

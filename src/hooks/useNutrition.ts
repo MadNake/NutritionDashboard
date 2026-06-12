@@ -25,16 +25,18 @@ export function useNutrition(rangeStart: string) {
     error: null,
   });
 
-  // The `since` of the currently loaded window, and the one in flight (dedupe).
+  // The `since` of the currently loaded window.
   const loadedSinceRef = useRef<string | null>(null);
-  const inFlightRef = useRef<string | null>(null);
+  // Monotonic id of the latest load; stale responses (any earlier id) are
+  // dropped so an out-of-order resolution can't overwrite a newer selection.
+  const reqIdRef = useRef(0);
 
   const load = useCallback(async (since: string) => {
-    if (inFlightRef.current === since) return;
-    inFlightRef.current = since;
+    const myReq = ++reqIdRef.current;
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
       const data = await fetchNutrition(since);
+      if (reqIdRef.current !== myReq) return; // superseded by a newer load
       loadedSinceRef.current = since;
       setState({
         meals: data.meals,
@@ -43,13 +45,12 @@ export function useNutrition(rangeStart: string) {
         error: null,
       });
     } catch (err) {
+      if (reqIdRef.current !== myReq) return; // superseded by a newer load
       setState((s) => ({
         ...s,
         loading: false,
         error: err instanceof Error ? err.message : String(err),
       }));
-    } finally {
-      inFlightRef.current = null;
     }
   }, []);
 

@@ -24,28 +24,6 @@ export function todayKey(): string {
   return toLocalKey(localMidnight());
 }
 
-/**
- * The `since` date for the API request = today − (days) in local time.
- * Default 6 → a 7-day window including today.
- */
-export function sinceKey(daysBack = 6): string {
-  const d = localMidnight();
-  d.setDate(d.getDate() - daysBack);
-  return toLocalKey(d);
-}
-
-/** Last N calendar-day keys including today, oldest → newest. */
-export function lastNDateKeys(n: number): string[] {
-  const base = localMidnight();
-  const out: string[] = [];
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(base);
-    d.setDate(base.getDate() - i);
-    out.push(toLocalKey(d));
-  }
-  return out;
-}
-
 /** Parse a "YYYY-MM-DD" key into a local Date (midnight). */
 export function dateFromKey(key: string): Date {
   const [y, m, d] = key.split("-").map(Number);

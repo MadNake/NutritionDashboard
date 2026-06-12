@@ -1,4 +1,5 @@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { presetRange, type DayRange } from "@/lib/dates";
 
 const OPTIONS = [
   { value: "1", label: "Сегодня" },
@@ -8,19 +9,27 @@ const OPTIONS = [
 ];
 
 export function PeriodSwitcher({
-  period,
-  onChange,
+  range,
+  onSelect,
 }: {
-  period: number;
-  onChange: (n: number) => void;
+  range: DayRange;
+  onSelect: (r: DayRange) => void;
 }) {
+  // Highlight a preset only when the active range matches it exactly;
+  // a custom calendar selection leaves all presets unselected.
+  const active =
+    OPTIONS.find((o) => {
+      const p = presetRange(Number(o.value));
+      return p.start === range.start && p.end === range.end;
+    })?.value ?? null;
+
   return (
     <ToggleGroup
       // Base UI: single-select (multiple defaults to false); value is an array.
-      value={[String(period)]}
+      value={active ? [active] : []}
       onValueChange={(vals) => {
         const v = vals[0];
-        if (v) onChange(Number(v));
+        if (v) onSelect(presetRange(Number(v)));
       }}
       variant="outline"
       className="w-full"

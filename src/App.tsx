@@ -3,8 +3,8 @@ import { toast } from "sonner";
 import { TriangleAlert } from "lucide-react";
 import { useNutrition } from "@/hooks/useNutrition";
 import { useGoals } from "@/hooks/useGoals";
-import { aggregateForPeriod, remaining } from "@/lib/aggregation";
-import { formatFetchedAt } from "@/lib/dates";
+import { aggregateForRange, remaining } from "@/lib/aggregation";
+import { formatFetchedAt, formatRangeLabel, presetRange, todayKey } from "@/lib/dates";
 import { fmt0 } from "@/lib/format";
 import { COLORS } from "@/lib/colors";
 import { ProgressRing } from "@/components/ProgressRing";
@@ -13,6 +13,7 @@ import { CaloriesDonut } from "@/components/CaloriesDonut";
 import { DailyBarChart } from "@/components/DailyBarChart";
 import { TodayMeals } from "@/components/TodayMeals";
 import { PeriodSwitcher } from "@/components/PeriodSwitcher";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import { RefreshButton } from "@/components/RefreshButton";
 import { SettingsSheet } from "@/components/SettingsSheet";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,18 +25,28 @@ const dateFmt = new Intl.DateTimeFormat("ru-RU", {
 });
 
 export default function App() {
-  const { meals, fetchedAt, loading, error, refresh } = useNutrition();
+  const [range, setRange] = useState(() => presetRange(1));
+  const { meals, fetchedAt, loading, error, refresh } = useNutrition(range.start);
   const { goals, setGoals, resetGoals } = useGoals();
-  const [period, setPeriod] = useState(1);
 
   useEffect(() => {
     if (error) toast.error("Failed to refresh data", { description: error });
   }, [error]);
 
-  const agg = useMemo(() => aggregateForPeriod(meals, period), [meals, period]);
+  const agg = useMemo(
+    () => aggregateForRange(meals, range.start, range.end),
+    [meals, range],
+  );
   const d = agg.display;
   const isAverage = agg.isAverage;
   const firstLoad = loading && meals.length === 0;
+
+  const isToday = !isAverage && range.start === todayKey();
+  const subtitle = isAverage
+    ? `Среднее за ${agg.periodDays} дн.`
+    : isToday
+      ? `Сегодня, ${dateFmt.format(new Date())}`
+      : formatRangeLabel(range.start, range.end);
 
   const caloriesLeft = remaining(goals.calories, d.kcal);
   const remainingLabel = isAverage ? "в среднем не хватает" : "осталось добрать";
@@ -46,11 +57,7 @@ export default function App() {
       <header className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl leading-tight">Питание</h1>
-          <p className="text-sm text-muted-foreground">
-            {isAverage
-              ? `Среднее за ${period} дн.`
-              : `Сегодня, ${dateFmt.format(new Date())}`}
-          </p>
+          <p className="text-sm text-muted-foreground">{subtitle}</p>
         </div>
         <div className="flex items-center gap-1">
           <SettingsSheet goals={goals} onSave={setGoals} onReset={resetGoals} />
@@ -58,7 +65,10 @@ export default function App() {
         </div>
       </header>
 
-      <PeriodSwitcher period={period} onChange={setPeriod} />
+      <div className="space-y-2">
+        <PeriodSwitcher range={range} onSelect={setRange} />
+        <DateRangePicker range={range} onChange={setRange} />
+      </div>
 
       <p className="mt-2 mb-4 text-center text-xs text-muted-foreground">
         {loading
@@ -176,8 +186,8 @@ export default function App() {
             <>
               <DailyBarChart perDay={agg.perDay} goal={goals.calories} />
               <p className="text-center text-xs text-muted-foreground">
-                Среднее за {period} календарных дней; день без записей считается
-                как 0.
+                Среднее за {agg.periodDays} календарных дней; день без записей
+                считается как 0.
               </p>
             </>
           ) : (

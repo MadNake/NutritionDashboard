@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchNutrition, type Meal } from "@/lib/nutrition-api";
-import { sinceKey } from "@/lib/dates";
+import { presetRange } from "@/lib/dates";
 
 interface NutritionState {
   meals: Meal[];
@@ -10,11 +10,14 @@ interface NutritionState {
 }
 
 /**
- * Loads the 7-day meal window once on mount and on demand via refresh().
- * All period switching (Today/2/3/7) is computed on the client from this data,
- * so it's instant and needs no extra requests.
+ * Loads meals for the selected range's start date and keeps the window cached.
+ *
+ * The fetched window always covers at least the last 7 days, so switching the
+ * 1/2/3/7-day presets is instant (no extra requests). Only when the chosen
+ * range starts earlier than what's already loaded do we refetch a wider window;
+ * the per-end-date cropping is done later in aggregation.
  */
-export function useNutrition() {
+export function useNutrition(rangeStart: string) {
   const [state, setState] = useState<NutritionState>({
     meals: [],
     fetchedAt: null,
@@ -22,10 +25,17 @@ export function useNutrition() {
     error: null,
   });
 
-  const refresh = useCallback(async () => {
+  // The `since` of the currently loaded window, and the one in flight (dedupe).
+  const loadedSinceRef = useRef<string | null>(null);
+  const inFlightRef = useRef<string | null>(null);
+
+  const load = useCallback(async (since: string) => {
+    if (inFlightRef.current === since) return;
+    inFlightRef.current = since;
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const data = await fetchNutrition(sinceKey(6));
+      const data = await fetchNutrition(since);
+      loadedSinceRef.current = since;
       setState({
         meals: data.meals,
         fetchedAt: data.fetchedAt,
@@ -38,12 +48,25 @@ export function useNutrition() {
         loading: false,
         error: err instanceof Error ? err.message : String(err),
       }));
+    } finally {
+      inFlightRef.current = null;
     }
   }, []);
 
+  // Window must cover both the chosen range start and the 7-day presets.
+  const presetSince = presetRange(7).start;
+  const neededSince = rangeStart < presetSince ? rangeStart : presetSince;
+
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    const loaded = loadedSinceRef.current;
+    if (loaded === null || neededSince < loaded) {
+      void load(neededSince);
+    }
+  }, [neededSince, load]);
+
+  const refresh = useCallback(() => {
+    void load(loadedSinceRef.current ?? neededSince);
+  }, [load, neededSince]);
 
   return { ...state, refresh };
 }

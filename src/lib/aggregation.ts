@@ -1,5 +1,5 @@
 import type { Meal } from "./nutrition-api";
-import { lastNDateKeys } from "./dates";
+import { dateKeysInRange, presetRange } from "./dates";
 
 export interface Totals {
   kcal: number;
@@ -46,7 +46,7 @@ export interface DayTotals {
 }
 
 export interface PeriodAggregate {
-  /** N — number of calendar days in the window (1 / 2 / 3 / 7). */
+  /** N — number of calendar days in the window. */
   periodDays: number;
   /** The N day keys, oldest → newest. */
   dateKeys: string[];
@@ -56,19 +56,23 @@ export interface PeriodAggregate {
   sum: Totals;
   /** Per-day totals (a day with no meals = 0 — a fair daily average). */
   perDay: DayTotals[];
-  /** What to show: the sum for "Today" (N=1) or the per-day average (N>1). */
+  /** What to show: the sum for a single day (N=1) or the per-day average (N>1). */
   display: Totals;
   /** True when display is an average (N>1). */
   isAverage: boolean;
 }
 
 /**
- * Aggregate the server window down to a single period.
- * N=1 → today's sum. N>1 → sum over the window divided by N calendar days,
+ * Aggregate meals over an inclusive [startKey, endKey] range of calendar days.
+ * N=1 → that day's sum. N>1 → sum over the window divided by N calendar days,
  * counting empty days as 0 (an honest "average per day").
  */
-export function aggregateForPeriod(meals: Meal[], n: number): PeriodAggregate {
-  const dateKeys = lastNDateKeys(n);
+export function aggregateForRange(
+  meals: Meal[],
+  startKey: string,
+  endKey: string,
+): PeriodAggregate {
+  const dateKeys = dateKeysInRange(startKey, endKey);
   const keySet = new Set(dateKeys);
   const windowMeals = meals.filter((m) => m.date !== null && keySet.has(m.date));
 
@@ -81,11 +85,21 @@ export function aggregateForPeriod(meals: Meal[], n: number): PeriodAggregate {
     totals: sumMeals(byDay.get(date)!),
   }));
 
+  const n = dateKeys.length;
   const sum = sumMeals(windowMeals);
   const isAverage = n > 1;
   const display = isAverage ? divideTotals(sum, n) : sum;
 
   return { periodDays: n, dateKeys, windowMeals, sum, perDay, display, isAverage };
+}
+
+/**
+ * Aggregate the last N days ending today — a thin wrapper over
+ * {@link aggregateForRange} kept for the 1/2/3/7-day presets.
+ */
+export function aggregateForPeriod(meals: Meal[], n: number): PeriodAggregate {
+  const { start, end } = presetRange(n);
+  return aggregateForRange(meals, start, end);
 }
 
 /** How much is still needed to reach a minimum (never negative). */
